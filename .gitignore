@@ -7,3 +7,6 @@ config.local.json
 .venv/
 venv/
 out.bin
+
+# 本地开发与部署手册：只在本机存在，不进公开仓库
+WORKFLOW.md
