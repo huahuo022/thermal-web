@@ -37,6 +37,20 @@ python3 server.py --port 8080 --data ./data
 
 ## API
 
+## Development workflow
+
+Edit locally, push to GitHub, then let the server update itself:
+
+```bash
+git add -A && git commit -m "feat: xxx" && git push
+curl -u admin:PASSWORD -X POST https://thermal-web.example.com:8080/api/update/apply \
+     -H 'Content-Type: application/json' -d '{}'
+```
+
+On Windows `tools/deploy.ps1 -Message "..."` does the push, triggers the update and
+waits until the server reports the same commit.  The checkout on the server is a
+pull-only mirror - edit in your local clone instead.
+
 ```bash
 curl -s localhost:8080/api/print -H 'Content-Type: application/json' -d '{
   "kind": "text", "text": "Hello\nTotal: 12.00", "align": "center", "size": "double"

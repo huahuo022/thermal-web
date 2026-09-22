@@ -97,6 +97,41 @@ sudo ./deploy.sh                    # 拉取 + 重新部署 + 重启服务
 
 `deploy.sh` 只做两件事：`git pull --ff-only`，然后调用 `install.sh`。
 
+### 推荐的开发流程：本地改 → 推送 → 让服务器自己更新
+
+**不要再 ssh 到服务器改代码**。服务器上的 `/root/thermal-web` 现在只是一个
+**只读的拉取副本**——在里面改东西会让 `merge --ff-only` 失败，更新就会卡住。
+
+```bash
+# 1) 本地（例如 E:\code\thermal-web）改代码并推送
+git add -A && git commit -m "feat: xxx"
+git push
+
+# 2) 让服务器自己拉取 + 重新部署 + 重启
+curl -u admin:你的密码 -X POST https://thermal-web.example.com:8080/api/update/apply \
+     -H 'Content-Type: application/json' -d '{}'
+
+# 3) 查状态（GET 只检查，不会更新）
+curl -u admin:你的密码 'https://thermal-web.example.com:8080/api/update?fetch=1'
+```
+
+Windows 上用 `tools/deploy.ps1` 可以把这三步合成一条命令（推送完会自动等服务器重启
+并核对提交是否一致）：
+
+```powershell
+$env:THERMAL_WEB_PASSWORD = "你的密码"
+.\tools\deploy.ps1 -Message "fix: 修正小票预览对齐"
+```
+
+推送凭据建议用 **deploy key**（仓库级、可写），不要用长期 token：把公钥加到
+仓库的 Settings → Deploy keys，勾上 Allow write access，然后让本地仓库用 SSH remote
+并只对这个仓库指定密钥：
+
+```bash
+git remote set-url origin git@github.com:huahuo022/thermal-web.git
+git config core.sshCommand "ssh -i ~/.ssh/thermal-web -o IdentitiesOnly=yes"
+```
+
 ### 版本更新（设置页里一键拉取并重启）
 
 设置页底部有「版本更新」区块，不用登录服务器就能更新：
