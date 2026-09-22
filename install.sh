@@ -11,9 +11,9 @@ command -v python3 >/dev/null || { echo "python3 is required"; exit 1; }
 
 echo "==> installing to $DEST"
 mkdir -p "$DEST"
-for item in server.py escpos.py transport.py store.py web; do
-  cp -r "$SOURCE/$item" "$DEST/"
-done
+# copy every module (not a hardcoded list, so new files cannot be forgotten)
+cp -f "$SOURCE"/*.py "$DEST/"
+cp -rf "$SOURCE/web" "$DEST/"
 mkdir -p "$DEST/data"
 chmod -R a+rX "$DEST"
 
