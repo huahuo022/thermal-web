@@ -39,14 +39,21 @@ python3 server.py --port 8080 --data ./data
 
 ### 加个密码
 
-编辑 `/etc/systemd/system/thermal-web.service`，去掉这一行的注释并改成你的密码：
+密码放在**仓库之外**的 `/etc/thermal-web.env`（权限 600），这样 `install.sh` 每次重新
+生成 unit 文件时都不会把它冲掉：
 
-```
-Environment=THERMAL_WEB_PASSWORD=your-password
+```bash
+sudo tee /etc/thermal-web.env >/dev/null <<'EOF'
+THERMAL_WEB_USER=admin
+THERMAL_WEB_PASSWORD=换成一个只有你知道的密码
+EOF
+sudo chmod 600 /etc/thermal-web.env
+sudo systemctl restart thermal-web
 ```
 
-然后 `systemctl daemon-reload && systemctl restart thermal-web`，即启用 HTTP Basic 认证
-（用户名默认 `admin`，可用 `THERMAL_WEB_USER` 改）。
+`install.sh` 首次运行会自动创建这个文件（带注释的模板）。删除文件里的密码行再重启
+即可关闭认证。unit 里的 `EnvironmentFile=-/etc/thermal-web.env` 前面那个 `-` 表示
+文件不存在也不报错。
 
 ### 把服务器本身当工作副本
 
