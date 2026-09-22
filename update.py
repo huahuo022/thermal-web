@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
 import subprocess
 import time
 
@@ -148,10 +149,38 @@ def apply(repo: str, dest: str, data_dir: str) -> dict:
     with open(path, "ab") as log:
         log.write(("\n$ %s\n" % script).encode())
         log.flush()
-        subprocess.Popen(
-            ["setsid", "bash", "-lc", script],
-            stdout=log, stderr=log, stdin=subprocess.DEVNULL,
-            cwd="/", env=_env(), start_new_session=True,
-        )
+        runner = _spawn(script, path, log)
 
-    return {"from": before, "to": target, "log": path}
+    return {"from": before, "to": target, "log": path, "runner": runner}
+
+
+def _spawn(script: str, logfile: str, log) -> str:
+    """Run the update outside this service's cgroup.
+
+    ``install.sh`` restarts this very service, and systemd kills everything
+    left in the unit's cgroup - a plain ``setsid`` child would be killed half
+    way through.  A transient systemd unit lives in its own cgroup, so it
+    survives the restart.
+    """
+    if shutil.which("systemd-run"):
+        unit = "thermal-web-update-%d" % int(time.time())
+        try:
+            result = subprocess.run(
+                ["systemd-run", "--collect", "--quiet", "--unit", unit,
+                 "--description=thermal-web update",
+                 "--property=StandardOutput=append:" + logfile,
+                 "--property=StandardError=append:" + logfile,
+                 "/bin/bash", "-lc", script],
+                capture_output=True, text=True, timeout=30, env=_env(),
+            )
+            if result.returncode == 0:
+                return "systemd-run:%s" % unit
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    subprocess.Popen(
+        ["setsid", "bash", "-lc", script],
+        stdout=log, stderr=log, stdin=subprocess.DEVNULL,
+        cwd="/", env=_env(), start_new_session=True,
+    )
+    return "setsid"
