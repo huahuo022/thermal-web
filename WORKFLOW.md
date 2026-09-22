@@ -68,6 +68,21 @@ Invoke-RestMethod -Uri "https://thermal-web.example.com:8080/api/update?fetch=1"
 
 也可以直接在浏览器里点：**设置页最下方 → 检查更新 / 一键更新并重启**。
 
+### 方式 C：应急——服务器连不上 GitHub
+
+如果服务器的网络出问题（到 GitHub 的 443 / 22 都不通），正常路径走不了，改用本地直推：
+
+```powershell
+cd E:\code\thermal-web
+python tools\emergency-deploy.py
+```
+
+它会把当前工作副本经 SSH 传到服务器，走仓库自己的 `install.sh` 安装并重启，并在最后
+逐个文件核对 sha256。细节见 README 的「应急部署」一节。
+
+⚠️ 这条路**不经过 GitHub**。网络恢复后要把同样的改动正常 `commit + push` 一次，
+否则下一次正常更新会把服务器上的代码覆盖回远端旧版本。
+
 ### 相关接口
 
 | 方法与路径 | 作用 |

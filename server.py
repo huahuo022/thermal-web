@@ -28,7 +28,7 @@ from store import Store
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 MAX_BODY = 12 * 1024 * 1024
 PRINT_LOCK = threading.Lock()
 STARTED = time.time()

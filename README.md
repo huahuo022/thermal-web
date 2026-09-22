@@ -155,6 +155,32 @@ cd E:\code\thermal-web
 - 要连真实打印机：目标改成 `socket:<打印机IP>:9100`，或者直接用服务器上的正式实例。
 - 打印相关改动请**先在本地用"试运行 / 文件目标"确认字节，再往真机上打**。
 
+### 应急部署（服务器连不上 GitHub 时）
+
+正常流程是服务器自己去 GitHub 拉代码。如果服务器的网络出问题（例如到 GitHub 的
+443 / 22 都不通），就用这个脚本从本机经 SSH 直接把代码推上去：
+
+```powershell
+cd E:\code\thermal-web
+python tools\emergency-deploy.py             # 默认 ssh 别名 rk3318
+python tools\emergency-deploy.py --dry-run   # 只打印计划
+python tools\emergency-deploy.py --ssh user@host --port 42222 -i ~\.ssh\rk3318
+```
+
+它的动作是：备份服务器上现有的 `/opt/thermal-web`（排除 `data/`）→ 把工作副本打成
+tar 流式传到服务器 `/tmp` → 用仓库自己的 `install.sh` 安装并重启 → 逐个文件比对
+sha256 并打印 `/api/status`；最后给出回滚命令。
+
+两个设计取舍值得知道：
+
+- **不修改服务器上的 git 工作副本**（`/root/thermal-web`）。往里写文件会让工作区变脏，
+  之后 `merge --ff-only` 必然失败，正常更新路径就废了。所以文件解到 `/tmp` 的临时目录，
+  再用那个目录里的 `install.sh` 安装。
+- **复用 `install.sh`**，这样应急路径部署的文件集合（`*.py` + `web/`）与正常路径完全一致。
+
+⚠️ 应急部署**不会**把代码送进 GitHub。网络恢复后请照常 `commit + push`，否则下一次
+正常更新会把服务器覆盖回 GitHub 上的旧版本。
+
 推送凭据建议用 **deploy key**（仓库级、可写），不要用长期 token：把公钥加到
 仓库的 Settings → Deploy keys，勾上 Allow write access，然后让本地仓库用 SSH remote
 并只对这个仓库指定密钥：
