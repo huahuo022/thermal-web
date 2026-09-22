@@ -157,3 +157,14 @@ table.history td.status-failed { color: var(--err); }
 .login-foot { margin: 16px 0 0; text-align: center; }
 .login-foot code { background: var(--panel-2); border: 1px solid var(--line);
   border-radius: 5px; padding: 1px 5px; font-size: 12px; }
+
+/* --------------------------------------------------------------- update */
+.update-box { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.update-head { display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; font-size: 13px; }
+.update-body { font-size: 12px; line-height: 1.8; color: var(--muted);
+  word-break: break-all; }
+.update-body b { color: var(--text); font-weight: 600; }
+.tag.ok { color: var(--ok); }
+.tag.warn { color: var(--warn); }
+.tag.err { color: var(--err); }

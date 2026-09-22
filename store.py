@@ -11,6 +11,7 @@ import time
 
 DEFAULTS = {
     "target": "device:/dev/usb/lp0",
+    "repo_path": "/root/thermal-web",
     "width_dots": 576,
     "encoding": "gbk",
     "chinese_mode": True,

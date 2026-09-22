@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import escpos
 import transport
 import auth
+import update
 from store import Store
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +31,7 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 VERSION = "1.0.0"
 MAX_BODY = 12 * 1024 * 1024
 PRINT_LOCK = threading.Lock()
+STARTED = time.time()
 
 
 def log(message: str):
@@ -165,6 +167,7 @@ def test_receipt(settings: dict) -> tuple:
 class Handler(BaseHTTPRequestHandler):
     server_version = "thermal-web/" + VERSION
     store: Store = None
+    data_dir: str = ""
     username: str = "admin"
     password: str = ""
     password_sha256: str = ""
@@ -341,6 +344,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json({
             "ok": True,
             "version": VERSION,
+            "started_at": int(STARTED),
             "settings": settings,
             "printer": info,
             "auth_required": self.auth_enabled,
@@ -367,6 +371,14 @@ class Handler(BaseHTTPRequestHandler):
                 query = urllib.parse.parse_qs(parsed.query)
                 limit = int(query.get("limit", ["50"])[0])
                 return self._json({"ok": True, "entries": self.store.history(limit)})
+            if path == "/api/update":
+                query = urllib.parse.parse_qs(parsed.query)
+                fetch = query.get("fetch", ["1"])[0].lower() not in ("0", "false", "no")
+                settings = self.store.settings()
+                report = update.check(settings.get("repo_path", ""), self.data_dir, fetch)
+                payload = {"ok": not report["error"]}
+                payload.update(report)
+                return self._json(payload, 200 if payload["ok"] else 502)
             if path.startswith("/api/history/") and path.endswith("/payload"):
                 entry_id = int(path.split("/")[3])
                 payload = self.store.payload(entry_id)
@@ -396,6 +408,23 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/settings":
                 settings = self.store.save_settings(request)
                 return self._json({"ok": True, "settings": settings})
+
+            if path == "/api/update/apply":
+                settings = self.store.settings()
+                repo = settings.get("repo_path", "")
+                try:
+                    result = update.apply(repo, BASE_DIR, self.data_dir)
+                except update.UpdateError as exc:
+                    return self._error(exc, 400)
+                log("update started: %s -> %s (repo %s)" % (
+                    (result["from"] or {}).get("short", "?"),
+                    (result["to"] or {}).get("short", "?"), repo))
+                return self._json({
+                    "ok": True,
+                    "from": result["from"],
+                    "to": result["to"],
+                    "message": "更新已开始，拉取完成后服务会自动重启",
+                })
 
             if path == "/api/history/clear":
                 removed = self.store.clear_history()
@@ -466,6 +495,7 @@ def main(argv=None):
     options = parser.parse_args(argv)
 
     Handler.store = Store(os.path.join(options.data, "thermal-web.db"))
+    Handler.data_dir = options.data
     Handler.username = os.environ.get("THERMAL_WEB_USER", "admin")
     Handler.password = os.environ.get("THERMAL_WEB_PASSWORD", "")
     Handler.password_sha256 = os.environ.get("THERMAL_WEB_PASSWORD_SHA256", "")

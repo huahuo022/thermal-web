@@ -165,6 +165,10 @@
         <label class="field"><span>打印后进纸行数</span><input type="number" id="set-feed" min="0" max="20" value="4"></label>
         <label class="field checkbox-line" title="发送 FS &amp; 指令，让打印机进入中文（双字节）模式">
           <input type="checkbox" id="set-chinese" checked> 中文模式指令</label>
+        <label class="field wide"><span>git 工作副本路径</span>
+          <input type="text" id="set-repo" placeholder="/root/thermal-web">
+          <small>一键更新会在这个目录执行 git pull，再运行它的 install.sh 重新部署并重启服务</small>
+        </label>
       </div>
       <div class="toolbar">
         <button id="btn-save" class="primary">保存设置</button>
@@ -173,6 +177,22 @@
       <p class="hint">
         交互式终端、CUPS 队列、网络打印机都能用同一个后端；设置改动即时生效，无需重启。
       </p>
+
+      <div class="update-box">
+        <div class="update-head">
+          <span>版本更新</span>
+          <span class="tag" id="update-state">未检查</span>
+        </div>
+        <div class="update-body" id="update-body">点「检查更新」看看 GitHub 上有没有新提交。</div>
+        <div class="toolbar">
+          <button id="btn-update-check">检查更新</button>
+          <button id="btn-update-apply" class="primary" disabled>一键更新并重启</button>
+        </div>
+        <details class="jsonbox" id="update-log-box" hidden>
+          <summary>更新日志</summary>
+          <pre id="update-log"></pre>
+        </details>
+      </div>
     </section>
   </div>
 

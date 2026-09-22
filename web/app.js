@@ -656,7 +656,9 @@ async function loadStatus() {
   $("set-cut").value = data.settings.cut;
   $("set-feed").value = data.settings.feed_lines;
   $("set-chinese").checked = !!data.settings.chinese_mode;
+  $("set-repo").value = data.settings.repo_path || "";
   $("image-width").value = String(data.settings.width_dots);
+  state.startedAt = data.started_at;
 }
 
 async function saveSettings() {
@@ -668,6 +670,7 @@ async function saveSettings() {
       cut: $("set-cut").value,
       feed_lines: Number($("set-feed").value),
       chinese_mode: $("set-chinese").checked,
+      repo_path: $("set-repo").value.trim(),
     });
     state.settings = data.settings;
     await loadStatus();
@@ -682,6 +685,109 @@ async function testPrint() {
     showResult(`自检页已发送：${data.message}（${data.bytes} 字节）`, true);
     refreshHistory();
   } catch (error) { showResult(error.message, false); }
+}
+
+/* ---------------------------------------------------------------- update */
+function describeCommit(commit) {
+  if (!commit) return "—";
+  return `${commit.short}  ${commit.date}  ${commit.subject}`;
+}
+
+function renderUpdate(report) {
+  state.update = report;
+  const stateEl = $("update-state");
+  const body = $("update-body");
+  const apply = $("btn-update-apply");
+  const logBox = $("update-log-box");
+  const log = $("update-log");
+
+  stateEl.className = "tag";
+  apply.disabled = true;
+
+  if (report.error) {
+    stateEl.textContent = "检查失败";
+    stateEl.classList.add("err");
+    body.innerHTML = `无法读取仓库 <code>${report.repo || "?"}</code>：<br>${report.error}`;
+  } else {
+    body.innerHTML =
+      `仓库 <code>${report.repo}</code>（分支 ${report.branch}）<br>` +
+      `本地：${describeCommit(report.current)}<br>` +
+      `远程：${describeCommit(report.remote)}`;
+    if (report.dirty) {
+      stateEl.textContent = "工作区有未提交改动";
+      stateEl.classList.add("warn");
+      body.innerHTML += "<br>工作区不干净，git pull 可能失败，请先处理后再更新。";
+    } else if (report.update_available) {
+      stateEl.textContent = `有 ${report.behind} 个新提交`;
+      stateEl.classList.add("ok");
+      apply.disabled = false;
+    } else {
+      stateEl.textContent = "已是最新";
+      stateEl.classList.add("ok");
+    }
+    if (report.ahead) body.innerHTML += `<br>本地还有 ${report.ahead} 个未推送的提交。`;
+  }
+
+  if (report.log_tail) {
+    logBox.hidden = false;
+    log.textContent = report.log_tail;
+  } else {
+    logBox.hidden = true;
+  }
+}
+
+async function checkUpdate() {
+  const stateEl = $("update-state");
+  stateEl.className = "tag";
+  stateEl.textContent = "检查中…";
+  $("update-body").textContent = "正在向 GitHub 查询…";
+  try {
+    const report = await api("/api/update?fetch=1");
+    renderUpdate(report);
+  } catch (error) {
+    stateEl.className = "tag err";
+    stateEl.textContent = "检查失败";
+    $("update-body").textContent = error.message;
+  }
+}
+
+async function waitForRestart(seconds = 120) {
+  const before = state.startedAt;
+  for (let i = 0; i < seconds; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch("/api/status", { cache: "no-store" });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.started_at && data.started_at !== before) {
+          location.reload();
+          return;
+        }
+      }
+    } catch (error) { /* 服务正在重启 */ }
+    $("update-state").textContent = `重启中… ${i + 1}s`;
+  }
+  $("update-state").className = "tag warn";
+  $("update-state").textContent = "更新超时";
+  $("update-body").textContent = "服务没有在预期时间内重启，请查看更新日志或手动刷新。";
+  await checkUpdate();
+}
+
+async function applyUpdate() {
+  const target = state.update && state.update.remote ? state.update.remote.short : "最新版本";
+  if (!confirm(`确定要拉取 ${target} 并重启服务吗？\n\n拉取期间界面会短暂中断，已保存的设置不会丢失。`)) return;
+  $("btn-update-apply").disabled = true;
+  $("update-state").className = "tag";
+  $("update-state").textContent = "更新中…";
+  $("update-body").textContent = "已开始拉取，服务重启后页面会自动刷新。";
+  try {
+    await api("/api/update/apply", {});
+    waitForRestart();
+  } catch (error) {
+    $("update-state").className = "tag err";
+    $("update-state").textContent = "更新失败";
+    $("update-body").textContent = error.message;
+  }
 }
 
 /* ------------------------------------------------------------------- init */
@@ -750,6 +856,8 @@ function bind() {
   $("btn-dry").onclick = () => submit(true);
   $("btn-save").onclick = saveSettings;
   $("btn-test").onclick = testPrint;
+  $("btn-update-check").onclick = checkUpdate;
+  $("btn-update-apply").onclick = applyUpdate;
   $("btn-logout").onclick = async () => {
     try { await api("/api/logout", {}); } catch (error) { /* ignore */ }
     location.href = "/login";
