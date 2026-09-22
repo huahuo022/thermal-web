@@ -9,16 +9,17 @@
     4) 轮询 /api/update?fetch=0，直到服务器的提交与刚推送的一致
 
 .EXAMPLE
+    $env:THERMAL_WEB_URL = "https://your-printer-host:8080"
     $env:THERMAL_WEB_PASSWORD = "你的密码"
     .\tools\deploy.ps1 -Message "fix: 修正小票预览的对齐"
 
 .EXAMPLE
-    .\tools\deploy.ps1 -Message "feat: xxx" -BaseUrl "https://thermal-web.example.com:8080"
+    .\tools\deploy.ps1 -Message "feat: xxx" -BaseUrl "https://your-printer-host:8080"
 #>
 [CmdletBinding()]
 param(
     [string]$Message,
-    [string]$BaseUrl = "https://thermal-web.example.com:8080",
+    [string]$BaseUrl = $env:THERMAL_WEB_URL,
     [string]$User = "admin",
     [string]$Password = $env:THERMAL_WEB_PASSWORD,
     [int]$TimeoutSeconds = 240
@@ -29,6 +30,9 @@ Set-Location (Split-Path -Parent $PSScriptRoot)
 
 if (-not $Password) {
     throw "请先设置 THERMAL_WEB_PASSWORD 环境变量，或用 -Password 传入"
+}
+if (-not $BaseUrl) {
+    throw "请用 -BaseUrl 或环境变量 THERMAL_WEB_URL 指定服务地址，例如 https://host:8080"
 }
 
 if (git status --porcelain) {
