@@ -24,8 +24,9 @@ if [ ! -f /etc/thermal-web.env ]; then
 #THERMAL_WEB_PASSWORD=change-me
 # Store a hash instead of the plaintext password (takes precedence):
 #THERMAL_WEB_PASSWORD_SHA256=
-# Session lifetime in hours (default 168 = 7 days), and set to 1 when
-# serving the UI over HTTPS so the cookie is only sent over TLS:
+# Session lifetime in hours (default 168 = 7 days).  The Secure flag is added
+# automatically when a reverse proxy reports HTTPS (X-Forwarded-Proto);
+# set this to 1 to force it even when the proxy does not send that header:
 #THERMAL_WEB_SESSION_HOURS=168
 #THERMAL_WEB_COOKIE_SECURE=0
 ENVEOF

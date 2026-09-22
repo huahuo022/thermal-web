@@ -72,7 +72,13 @@ sudo systemctl restart thermal-web
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `THERMAL_WEB_SESSION_HOURS` | `168` | 会话有效期（小时） |
-| `THERMAL_WEB_COOKIE_SECURE` | `0` | 置 `1` 时给 Cookie 加 `Secure`（HTTPS 部署） |
+| `THERMAL_WEB_COOKIE_SECURE` | `0` | 置 `1` 时**强制**给 Cookie 加 `Secure` |
+
+**反代 + HTTPS 的说明**：服务会读取 `X-Forwarded-Proto`（以及 Cloudflare 的
+`CF-Visitor`、标准的 `Forwarded`）来自动判断客户端用的是不是 HTTPS，是的话就给会话
+Cookie 加 `Secure`，否则不加。所以同一个实例可以同时被 `http://内网IP:8080` 和
+`https://域名/login` 访问，两条路都能正常登录。如果你的反代没转发这些头，再手动把
+`THERMAL_WEB_COOKIE_SECURE` 设为 `1`（代价是纯 HTTP 访问会登录不上）。
 
 连续输错 5 次密码会临时限流（5 分钟窗口，按来源 IP 计）。所有 API 仍然接受
 HTTP Basic，方便脚本调用（`curl -u admin:密码 ...`）；服务器不会再返回

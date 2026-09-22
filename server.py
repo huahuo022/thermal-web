@@ -198,6 +198,22 @@ class Handler(BaseHTTPRequestHandler):
     def _client(self) -> str:
         return self.client_address[0] if self.client_address else "?"
 
+    def _forwarded_proto(self) -> str:
+        """Scheme the client used, as reported by a reverse proxy."""
+        value = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+        if value in ("http", "https"):
+            return value
+        visitor = (self.headers.get("CF-Visitor") or "").replace(" ", "")
+        if '"scheme":"https"' in visitor:
+            return "https"
+        if "proto=https" in (self.headers.get("Forwarded") or "").lower():
+            return "https"
+        return ""
+
+    def _secure_cookie(self) -> bool:
+        """Mark the session cookie Secure on HTTPS, but keep plain HTTP usable."""
+        return bool(self.cookie_secure) or self._forwarded_proto() == "https"
+
     def _basic_user(self):
         pair = auth.basic_credentials(self.headers.get("Authorization", ""))
         if not pair or not auth.check_credentials(pair[0], pair[1], self.username,
@@ -237,13 +253,13 @@ class Handler(BaseHTTPRequestHandler):
         token = auth.make_token(user, self.secret, self.session_ttl)
         cookie = "%s=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d" % (
             auth.COOKIE_NAME, token, int(self.session_ttl))
-        if self.cookie_secure:
+        if self._secure_cookie():
             cookie += "; Secure"
         return cookie
 
     def _expired_cookie(self) -> str:
         cookie = "%s=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" % auth.COOKIE_NAME
-        if self.cookie_secure:
+        if self._secure_cookie():
             cookie += "; Secure"
         return cookie
 
@@ -279,7 +295,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "用户名或密码错误"}, 401)
 
         self.attempts.reset(client)
-        log("login ok: %s from %s" % (user, client))
+        log("login ok: %s from %s (client scheme=%r, secure cookie=%s)"
+            % (user, client, self._forwarded_proto() or "http", self._secure_cookie()))
         return self._send_json({"ok": True, "redirect": target},
                                cookie=self._session_cookie(user))
 
