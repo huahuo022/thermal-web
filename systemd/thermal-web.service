@@ -1,0 +1,19 @@
+[Unit]
+Description=thermal-web - web UI for ESC/POS thermal printers
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/thermal-web
+ExecStart=/usr/bin/python3 /opt/thermal-web/server.py --port 8080
+Environment=THERMAL_WEB_DATA=/opt/thermal-web/data
+# Set a password to enable HTTP basic auth, e.g. THERMAL_WEB_PASSWORD=changeme
+#Environment=THERMAL_WEB_PASSWORD=
+Restart=on-failure
+RestartSec=5
+# needed to write to the USB printer device node
+User=root
+
+[Install]
+WantedBy=multi-user.target

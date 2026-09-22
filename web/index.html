@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>thermal-web · 热敏打印</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🖨️ thermal-web <span class="tag" id="version"></span></div>
+  <div class="status" id="status">连接中…</div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="text">文本</button>
+  <button class="tab" data-tab="image">图片</button>
+  <button class="tab" data-tab="code">二维码 / 条码</button>
+  <button class="tab" data-tab="receipt">小票</button>
+  <button class="tab" data-tab="history">历史</button>
+  <button class="tab" data-tab="settings">设置</button>
+</nav>
+
+<main>
+  <div class="left">
+
+    <section class="panel active" id="panel-text">
+      <label class="field">
+        <span>打印内容（支持中文，按打印机码页输出）</span>
+        <textarea id="text-body" rows="10" placeholder="第一行&#10;第二行&#10;金额：12.00"></textarea>
+      </label>
+      <div class="grid">
+        <label class="field"><span>对齐</span>
+          <select id="text-align"><option value="left">左</option><option value="center">中</option><option value="right">右</option></select>
+        </label>
+        <label class="field"><span>字号</span>
+          <select id="text-size">
+            <option value="normal">正常</option><option value="double-width">双宽</option>
+            <option value="double-height">双高</option><option value="double">整倍</option>
+            <option value="large">三倍</option>
+          </select>
+        </label>
+        <label class="field"><span>字体</span>
+          <select id="text-font"><option value="a">A（48 列）</option><option value="b">B（64 列，窄）</option></select>
+        </label>
+        <label class="field"><span>下划线</span>
+          <select id="text-underline"><option value="0">无</option><option value="1">细</option><option value="2">粗</option></select>
+        </label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="text-bold"> 加粗</label>
+        <label><input type="checkbox" id="text-invert"> 反白</label>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-image">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="image-file" accept="image/*" hidden>
+        <p><strong>点击选择</strong> 或把图片拖到这里</p>
+        <p class="hint">在浏览器里完成缩放与抖动，预览即打印结果</p>
+      </div>
+      <div class="grid">
+        <label class="field"><span>抖动算法</span>
+          <select id="image-dither">
+            <option value="threshold">阈值（文字/线条最清晰）</option>
+            <option value="floyd">Floyd–Steinberg（照片）</option>
+            <option value="atkinson">Atkinson（浅色调）</option>
+          </select>
+        </label>
+        <label class="field"><span>阈值 <output id="threshold-out">160</output></span>
+          <input type="range" id="image-threshold" min="0" max="255" value="160">
+        </label>
+        <label class="field"><span>纸宽</span>
+          <select id="image-width"><option value="576">576 点（80mm）</option><option value="384">384 点（58mm）</option><option value="512">512 点</option></select>
+        </label>
+        <label class="field checkbox-line"><input type="checkbox" id="image-trim" checked> 裁掉空白边</label>
+      </div>
+      <p class="hint" id="image-info">未选择图片</p>
+    </section>
+
+    <section class="panel" id="panel-code">
+      <div class="grid">
+        <label class="field"><span>类型</span>
+          <select id="code-type">
+            <option value="qr">二维码 QR</option>
+            <option value="code128">条码 CODE128</option>
+            <option value="ean13">条码 EAN-13</option>
+            <option value="code39">条码 CODE39</option>
+            <option value="upca">条码 UPC-A</option>
+            <option value="itf">条码 ITF</option>
+          </select>
+        </label>
+        <label class="field"><span>内容</span><input type="text" id="code-data" value="https://github.com/"></label>
+      </div>
+      <div class="grid" id="qr-options">
+        <label class="field"><span>模块大小 <output id="qr-module-out">6</output></span>
+          <input type="range" id="qr-module" min="2" max="12" value="6"></label>
+        <label class="field"><span>纠错级别</span>
+          <select id="qr-ecc"><option>L</option><option selected>M</option><option>Q</option><option>H</option></select></label>
+      </div>
+      <div class="grid" id="barcode-options" hidden>
+        <label class="field"><span>条高 <output id="bc-height-out">80</output></span>
+          <input type="range" id="bc-height" min="20" max="200" value="80"></label>
+        <label class="field"><span>条宽 <output id="bc-width-out">2</output></span>
+          <input type="range" id="bc-width" min="2" max="5" value="2"></label>
+        <label class="field"><span>文字位置</span>
+          <select id="bc-hri"><option value="below" selected>下方</option><option value="above">上方</option><option value="both">上下</option><option value="none">不显示</option></select></label>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-receipt">
+      <div class="toolbar">
+        <button data-add="text">+ 文本</button>
+        <button data-add="kv">+ 键值</button>
+        <button data-add="row">+ 表格行</button>
+        <button data-add="divider">+ 分隔线</button>
+        <button data-add="qr">+ 二维码</button>
+        <button data-add="barcode">+ 条码</button>
+        <button data-add="feed">+ 进纸</button>
+        <button data-add="cut">+ 切纸</button>
+      </div>
+      <div id="blocks" class="blocks"></div>
+      <details class="jsonbox">
+        <summary>JSON 导入 / 导出</summary>
+        <textarea id="receipt-json" rows="8" spellcheck="false"></textarea>
+        <div class="toolbar">
+          <button id="btn-json-export">导出到上方</button>
+          <button id="btn-json-import">从上方导入</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel" id="panel-history">
+      <div class="toolbar">
+        <button id="btn-history-refresh">刷新</button>
+        <button id="btn-history-clear">清空历史</button>
+      </div>
+      <table class="history">
+        <thead><tr><th>#</th><th>时间</th><th>类型</th><th>摘要</th><th>字节</th><th>状态</th><th></th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="panel-settings">
+      <div class="grid">
+        <label class="field wide"><span>打印目标</span>
+          <input type="text" id="set-target" placeholder="device:/dev/usb/lp0">
+          <small>device:/dev/usb/lp0 · socket:192.168.1.50:9100 · cups:队列名</small>
+        </label>
+        <label class="field"><span>纸宽（点）</span>
+          <select id="set-width"><option value="576">576（80mm）</option><option value="384">384（58mm）</option><option value="512">512</option></select></label>
+        <label class="field"><span>字符编码</span>
+          <select id="set-encoding"><option value="gbk">GBK（中文机）</option><option value="gb18030">GB18030</option><option value="big5">BIG5（繁体）</option><option value="cp437">CP437（西文）</option><option value="utf-8">UTF-8（部分机型）</option></select></label>
+        <label class="field"><span>切纸</span>
+          <select id="set-cut"><option value="partial">半切</option><option value="full">全切</option><option value="none">不切</option></select></label>
+        <label class="field"><span>打印后进纸行数</span><input type="number" id="set-feed" min="0" max="20" value="4"></label>
+        <label class="field checkbox-line"><input type="checkbox" id="set-chinese" checked> 发送中文模式指令（FS &amp;）</label>
+      </div>
+      <div class="toolbar">
+        <button id="btn-save" class="primary">保存设置</button>
+        <button id="btn-test" class="primary ghost">打印自检页</button>
+      </div>
+      <p class="hint">
+        交互式终端、CUPS 队列、网络打印机都能用同一个后端；设置改动即时生效，无需重启。
+      </p>
+    </section>
+  </div>
+
+  <aside class="right">
+    <div class="preview-head">
+      <span>预览</span><span class="tag" id="preview-meta"></span>
+    </div>
+    <div class="paper-wrap"><canvas id="preview" width="576" height="400"></canvas></div>
+    <div class="actions">
+      <button id="btn-print" class="primary">打印</button>
+      <button id="btn-dry">试运行（不打印）</button>
+    </div>
+    <p class="result" id="result"></p>
+    <details class="jsonbox">
+      <summary>ESC/POS 字节（试运行后可见）</summary>
+      <pre id="hex">—</pre>
+    </details>
+  </aside>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
