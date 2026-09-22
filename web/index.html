@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>thermal-web · 热敏打印</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🖨️</text></svg>">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -141,10 +142,12 @@
         <button id="btn-history-refresh">刷新</button>
         <button id="btn-history-clear">清空历史</button>
       </div>
-      <table class="history">
-        <thead><tr><th>#</th><th>时间</th><th>类型</th><th>摘要</th><th>字节</th><th>状态</th><th></th></tr></thead>
-        <tbody id="history-body"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="history">
+          <thead><tr><th>#</th><th>时间</th><th>类型</th><th>摘要</th><th>字节</th><th>状态</th><th></th></tr></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
     </section>
 
     <section class="panel" id="panel-settings">
@@ -160,7 +163,8 @@
         <label class="field"><span>切纸</span>
           <select id="set-cut"><option value="partial">半切</option><option value="full">全切</option><option value="none">不切</option></select></label>
         <label class="field"><span>打印后进纸行数</span><input type="number" id="set-feed" min="0" max="20" value="4"></label>
-        <label class="field checkbox-line"><input type="checkbox" id="set-chinese" checked> 发送中文模式指令（FS &amp;）</label>
+        <label class="field checkbox-line" title="发送 FS &amp; 指令，让打印机进入中文（双字节）模式">
+          <input type="checkbox" id="set-chinese" checked> 中文模式指令</label>
       </div>
       <div class="toolbar">
         <button id="btn-save" class="primary">保存设置</button>

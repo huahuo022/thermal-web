@@ -451,6 +451,11 @@ const BLOCK_FIELDS = {
   cut: [],
 };
 
+const BLOCK_LABELS = {
+  text: "文本", kv: "键值", row: "表格行", divider: "分隔线", qr: "二维码",
+  barcode: "条码", feed: "进纸", cut: "切纸", drawer: "钱箱", beep: "蜂鸣",
+};
+
 function renderBlocks() {
   const container = $("blocks");
   container.innerHTML = "";
@@ -459,7 +464,7 @@ function renderBlocks() {
     element.className = "block";
     const head = document.createElement("div");
     head.className = "block-head";
-    head.innerHTML = `<span class="name">${index + 1}. ${block.type}</span>`;
+    head.innerHTML = `<span class="name">${index + 1}. ${BLOCK_LABELS[block.type] || block.type}</span>`;
     const tools = document.createElement("span");
     for (const [label, action] of [["↑", -1], ["↓", 1], ["✕", 0]]) {
       const button = document.createElement("button");
@@ -535,6 +540,10 @@ function switchTab(tab) {
     button.classList.toggle("active", button.dataset.tab === tab));
   document.querySelectorAll(".panel").forEach((panel) =>
     panel.classList.toggle("active", panel.id === "panel-" + tab));
+  const printable = ["text", "image", "code", "receipt"].includes(tab);
+  $("btn-print").disabled = !printable;
+  $("btn-dry").disabled = !printable;
+  document.querySelector(".right").classList.toggle("inactive", !printable);
   if (tab === "history") refreshHistory();
   renderPreview();
 }
@@ -597,6 +606,13 @@ async function refreshHistory() {
     const data = await api("/api/history?limit=50");
     const body = $("history-body");
     body.innerHTML = "";
+    if (!data.entries.length) {
+      const empty = document.createElement("tr");
+      empty.className = "empty";
+      empty.innerHTML = '<td colspan="7">暂无打印记录</td>';
+      body.appendChild(empty);
+      return;
+    }
     for (const entry of data.entries) {
       const row = document.createElement("tr");
       row.innerHTML =

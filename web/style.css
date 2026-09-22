@@ -13,6 +13,10 @@
 
 * { box-sizing: border-box; }
 
+/* author rules such as `.grid { display: grid }` beat the UA [hidden] rule, so
+   elements hidden by JS with the hidden attribute kept showing up */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -58,17 +62,21 @@ main {
 .field > span { font-size: 12px; color: var(--muted); }
 .field small { color: var(--muted); font-size: 11px; }
 .field.wide { grid-column: 1 / -1; }
-.checkbox-line { flex-direction: row; align-items: center; gap: 8px; }
+.checkbox-line { flex-direction: row; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .checks { display: flex; gap: 16px; margin-bottom: 8px; }
-.checks label { display: flex; align-items: center; gap: 6px; }
+.checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 
-input[type=text], input[type=number], select, textarea {
+input[type=text], input[type=password], input[type=number], input[type=search],
+input[type=email], input[type=url], input[type=tel], select, textarea {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
   border-radius: 7px; padding: 8px 10px; font: inherit; width: 100%;
 }
 textarea { resize: vertical; font-family: ui-monospace, Consolas, monospace; }
 input[type=range] { width: 100%; }
+input[type=checkbox] { width: 15px; height: 15px; margin: 0; flex: none;
+  accent-color: var(--accent); cursor: pointer; }
 input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
 
 button {
@@ -81,11 +89,14 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary.ghost { background: transparent; color: var(--accent); }
 button.danger { color: var(--err); }
 button.tiny { padding: 3px 8px; font-size: 12px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:disabled:hover { border-color: var(--line); }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 
 .right { position: sticky; top: 12px; align-self: start; background: var(--panel);
   border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.right.inactive { opacity: .5; }
 .preview-head { display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 8px; font-size: 13px; color: var(--muted); }
 .paper-wrap { background: #0b0d11; border: 1px solid var(--line); border-radius: 8px;
@@ -107,7 +118,7 @@ button.tiny { padding: 3px 8px; font-size: 12px; }
   padding: 10px 12px; }
 .block-head { display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 8px; font-size: 12px; color: var(--muted); }
-.block-head .name { text-transform: uppercase; letter-spacing: .4px; }
+.block-head .name { letter-spacing: .3px; color: var(--text); }
 .block-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .block .field { margin-bottom: 0; }
 
@@ -118,6 +129,8 @@ button.tiny { padding: 3px 8px; font-size: 12px; }
   max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 
 table.history { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table-wrap { overflow-x: auto; }
+.history .empty td { color: var(--muted); text-align: center; padding: 20px 8px; }
 table.history th, table.history td { text-align: left; padding: 7px 8px;
   border-bottom: 1px solid var(--line); }
 table.history th { color: var(--muted); font-weight: 500; font-size: 12px; }
