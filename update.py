@@ -132,14 +132,18 @@ def apply(repo: str, dest: str, data_dir: str) -> dict:
     before = _commit(repo, "HEAD")
     target = None
     try:
-        target = _commit(repo, "origin/%s" % _git(repo, "rev-parse", "--abbrev-ref", "HEAD"))
+        branch = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+        _git(repo, "fetch", "--quiet", "--prune", "origin", branch)
+        target = _commit(repo, "origin/%s" % branch)
     except UpdateError:
         pass
 
     script = (
         "cd {repo} && "
         "echo '=== update started' $(date '+%F %T') && "
-        "git pull --ff-only && "
+        "branch=$(git rev-parse --abbrev-ref HEAD) && "
+        "git fetch --prune origin \"$branch\" && "
+        "git merge --ff-only \"origin/$branch\" && "
         "./install.sh {dest} && "
         "echo '=== update finished' $(date '+%F %T')"
     ).format(repo=shlex.quote(repo), dest=shlex.quote(dest))
