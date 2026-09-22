@@ -423,6 +423,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "from": result["from"],
                     "to": result["to"],
+                    "runner": result.get("runner"),
                     "message": "更新已开始，拉取完成后服务会自动重启",
                 })
 

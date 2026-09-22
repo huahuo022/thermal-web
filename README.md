@@ -97,6 +97,30 @@ sudo ./deploy.sh                    # 拉取 + 重新部署 + 重启服务
 
 `deploy.sh` 只做两件事：`git pull --ff-only`，然后调用 `install.sh`。
 
+### 版本更新（设置页里一键拉取并重启）
+
+设置页底部有「版本更新」区块，不用登录服务器就能更新：
+
+1. **git 工作副本路径**（默认 `/root/thermal-web`）必须是**带 `.git` 的目录**，
+   运行目录 `/opt/thermal-web` 只是它的一份副本。
+2. 点**检查更新**：服务会在该目录执行 `git fetch`，对比本地 `HEAD` 与
+   `origin/<分支>`，显示两边的最新提交、落后/领先几个提交、工作区是否干净。
+3. 点**一键更新并重启**：后台执行 `git pull --ff-only && ./install.sh <运行目录>`，
+   服务重启后页面会自己刷新。
+
+几个实现细节，都是踩过的坑：
+
+- **更新进程跑在独立 cgroup 里**（`systemd-run` 起一个瞬时单元，失败时退回 `setsid`）。
+  因为 `install.sh` 会重启本服务，而 systemd 会清理该服务 cgroup 内的所有进程——
+  只换会话（`setsid`）不够，更新进程会被连带杀掉，日志写不完、部署可能被腰斩。
+- 拉取固定用 `--ff-only`：工作副本有未提交改动时不会硬合并，界面会提前把 `dirty`
+  标出来并禁用按钮。
+- 更新进程的全部输出写到 `<数据目录>/update.log`，界面里可直接展开查看。
+- `/api/update` 与 `/api/update/apply` 都需要登录；`apply` 会以服务身份执行
+  git 与 `install.sh`（所以服务本身以 root 运行）。
+- 该目录必须能**免交互**访问远端：本项目在服务器上用的是 deploy key + SSH remote
+  （注意 GitHub 的 HTTPS git 端点在部分网络下不可用，改用 SSH 即可）。
+
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
