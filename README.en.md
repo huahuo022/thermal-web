@@ -1,5 +1,9 @@
 # thermal-web
 
+> **The Chinese [README.md](README.md) is the primary documentation** and the one kept
+> up to date. This English page is a short summary and may lag behind - it does not
+> cover the login page, the in-app update panel or the emergency deploy script yet.
+
 A tiny self-hosted web UI for ESC/POS thermal receipt printers.
 **Zero third-party dependencies** - Python 3 standard library only.
 
