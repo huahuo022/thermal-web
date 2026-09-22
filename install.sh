@@ -38,4 +38,5 @@ echo
 systemctl --no-pager --lines=0 status thermal-web || true
 echo
 echo "==> done.  open http://<host>:$PORT"
-echo "    hint: to enable auth, add Environment=THERMAL_WEB_PASSWORD=... to the unit"
+echo "    hint: to enable auth, put THERMAL_WEB_PASSWORD in /etc/thermal-web.env"
+echo "          (chmod 600) and run: systemctl restart thermal-web"
