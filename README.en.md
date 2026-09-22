@@ -24,7 +24,7 @@ and code page selection.
 ## Install
 
 ```bash
-git clone https://github.com/<you>/thermal-web.git
+git clone https://github.com/huahuo022/thermal-web.git
 cd thermal-web
 sudo ./install.sh          # installs to /opt/thermal-web, listens on 8080
 ```

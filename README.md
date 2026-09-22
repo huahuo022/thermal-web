@@ -24,7 +24,7 @@ ESC/POS 指令写到打印机，所以文字锐利、速度快、能用切纸和
 ## 安装
 
 ```bash
-git clone https://github.com/<you>/thermal-web.git
+git clone https://github.com/huahuo022/thermal-web.git
 cd thermal-web
 sudo ./install.sh          # 默认装到 /opt/thermal-web，监听 8080
 ```
