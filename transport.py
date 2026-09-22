@@ -9,6 +9,10 @@ import socket
 import subprocess
 import time
 
+# os.O_NONBLOCK (and select() on the descriptor) only exist on POSIX; on
+# Windows a blocking write is the only option, which is fine for files/ports.
+NONBLOCK = hasattr(os, "O_NONBLOCK")
+
 
 def describe(target: str) -> dict:
     kind, _, rest = str(target).partition(":")
@@ -40,6 +44,8 @@ def _write_fd(fd, payload, timeout):
             written = os.write(fd, view)
             view = view[written:]
         except BlockingIOError:
+            if not NONBLOCK:
+                raise
             remaining = deadline - time.time()
             if remaining <= 0:
                 raise TimeoutError("timed out writing to the printer")
@@ -56,7 +62,7 @@ def send(payload: bytes, target: str, timeout: float = 20.0) -> tuple:
         if kind in ("device", "file"):
             if not os.path.exists(rest):
                 return False, "%s does not exist" % rest
-            fd = os.open(rest, os.O_WRONLY | os.O_NONBLOCK)
+            fd = os.open(rest, os.O_WRONLY | (os.O_NONBLOCK if NONBLOCK else 0))
             try:
                 _write_fd(fd, payload, timeout)
                 time.sleep(0.4)

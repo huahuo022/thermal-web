@@ -4,3 +4,6 @@ __pycache__/
 *.pyo
 .DS_Store
 config.local.json
+.venv/
+venv/
+out.bin

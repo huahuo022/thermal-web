@@ -125,6 +125,36 @@ $env:THERMAL_WEB_PASSWORD = "你的密码"
 .\tools\deploy.ps1 -Message "fix: 修正小票预览对齐"
 ```
 
+### 本地调试（Windows 为例）
+
+`E:\code\thermal-web` 下已经建好虚拟环境 `.venv`（Python 3.11）：
+
+```powershell
+cd E:\code\thermal-web
+
+# 可选依赖：运行本身是纯标准库，不装也能跑
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+# 起一份本地实例（避开 8080，免得和别的程序撞）
+.\.venv\Scripts\python.exe server.py --port 8099 --data .\data
+# 然后打开 http://127.0.0.1:8099
+```
+
+几个本地调试要点：
+
+- 本地**不要**设 `THERMAL_WEB_PASSWORD`，这样不用登录，改界面刷新即可。
+- **没有打印机也能调**：默认目标 `device:/dev/usb/lp0` 在 Windows 上不存在，状态栏会显示
+  "不可用"，但页面照常渲染；要确认生成的指令对不对，点「试运行（不打印）」看字节。
+- **想让打印真的落到文件**（推荐，方便核对 ESC/POS 原始字节）：
+  ```powershell
+  New-Item -ItemType File .\out.bin -Force
+  # 设置页把「打印目标」改成 device:out.bin，然后正常点「打印」
+  ```
+  打完 `out.bin` 里就是完整的指令流，可以用十六进制工具或
+  `Format-Hex .\out.bin` 看。（`device:` 目标要求文件先存在，这是故意的。）
+- 要连真实打印机：目标改成 `socket:<打印机IP>:9100`，或者直接用服务器上的正式实例。
+- 打印相关改动请**先在本地用"试运行 / 文件目标"确认字节，再往真机上打**。
+
 推送凭据建议用 **deploy key**（仓库级、可写），不要用长期 token：把公钥加到
 仓库的 Settings → Deploy keys，勾上 Allow write access，然后让本地仓库用 SSH remote
 并只对这个仓库指定密钥：
