@@ -68,6 +68,145 @@ const wrapText = (text, columns) => {
 };
 
 /* ------------------------------------------------------------- preview ops */
+
+/* ------------------------------------------------- 二维码 / 条码编码
+   编码表来自 web/vendor/barcode-tables.js（由 python-barcode 0.16.1 导出），
+   二维码用 web/vendor/qrcode.js（MIT，Kazuhiko Arase）。
+   预览里的模块/条宽严格按设置缩放，所以和打印出来的排布一致。 */
+
+function bitsFromWidths(widths, narrow, wide) {
+  let out = "";
+  for (const ch of widths) {
+    const upper = ch.toUpperCase();
+    const isBar = ch === upper;
+    out += (isBar ? "1" : "0").repeat(upper === "W" ? wide : narrow);
+  }
+  return out;
+}
+
+function encodeCode128(data) {
+  const text = String(data ?? "");
+  if (!text) return null;
+  const values = [104];              // START B
+  let checksum = 104;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 32 || code > 127) return null;   // 码集 B 覆盖 ASCII 32..127
+    values.push(code - 32);
+    checksum += (code - 32) * (i + 1);
+  }
+  values.push(checksum % 103, 106);  // 校验位 + STOP
+  let bits = "";
+  for (const value of values) {
+    bits += value === 106 ? "1100011101011" : (CODE128[value] || "");
+  }
+  return bits || null;
+}
+
+function encodeCode39(data) {
+  const text = String(data ?? "").toUpperCase();
+  if (!text) return null;
+  let bits = CODE39_START + "0";
+  for (const ch of text) {
+    if (!CODE39[ch]) return null;
+    bits += CODE39[ch] + "0";
+  }
+  return bits + CODE39_START;
+}
+
+function eanCheckDigit(digits) {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    sum += Number(digits[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+function encodeEan13(data) {
+  let digits = String(data ?? "").replace(/\D/g, "");
+  if (digits.length === 12) digits += eanCheckDigit(digits);
+  if (digits.length !== 13) return null;
+  const parity = EAN_PARITY[Number(digits[0])];
+  let bits = EAN_EDGE;
+  for (let i = 1; i <= 6; i++) {
+    const code = EAN_CODES[parity[i - 1]][Number(digits[i])];
+    bits += code;
+  }
+  bits += "01010";
+  for (let i = 7; i <= 12; i++) bits += EAN_CODES.C[Number(digits[i])];
+  return { bits: bits + EAN_EDGE, text: digits };
+}
+
+function encodeUpcA(data) {
+  let digits = String(data ?? "").replace(/\D/g, "");
+  if (digits.length === 11) digits += eanCheckDigit("0" + digits);
+  if (digits.length !== 12) return null;
+  const ean = encodeEan13("0" + digits);
+  return ean ? { bits: ean.bits, text: digits } : null;
+}
+
+function encodeItf(data) {
+  const digits = String(data ?? "").replace(/\D/g, "");
+  if (!digits.length || digits.length % 2) return null;
+  let widths = ITF_START;
+  for (let i = 0; i < digits.length; i += 2) {
+    const bars = ITF_CODES[Number(digits[i])];
+    const spaces = ITF_CODES[Number(digits[i + 1])];
+    for (let j = 0; j < 5; j++) widths += bars[j].toUpperCase() + spaces[j].toLowerCase();
+  }
+  widths += ITF_STOP;
+  return { bits: bitsFromWidths(widths, 1, 3), text: digits };
+}
+
+function encodeBarcode(symbology, data, options = {}) {
+  const kind = String(symbology || "code128").toLowerCase();
+  if (kind === "code128") {
+    const bits = encodeCode128(data);
+    return bits ? { bits, text: String(data ?? "") } : null;
+  }
+  if (kind === "code39") {
+    const bits = encodeCode39(data);
+    return bits ? { bits, text: String(data ?? "").toUpperCase() } : null;
+  }
+  if (kind === "ean13") return encodeEan13(data);
+  if (kind === "upca" || kind === "upc") return encodeUpcA(data);
+  if (kind === "itf") return encodeItf(data);
+  return null;
+}
+
+function qrMatrix(data, ecc) {
+  if (typeof qrcode !== "function" || !String(data ?? "").length) return null;
+  try {
+    const qr = qrcode(0, String(ecc || "M").toUpperCase());   // 0 = 自动选版本
+    qr.addData(String(data));
+    qr.make();
+    const count = qr.getModuleCount();
+    const rows = [];
+    for (let r = 0; r < count; r++) {
+      const row = [];
+      for (let c = 0; c < count; c++) row.push(qr.isDark(r, c) ? 1 : 0);
+      rows.push(row);
+    }
+    return rows;
+  } catch (error) {
+    return null;
+  }
+}
+
+function hriRows(hri) {
+  if (hri === "none") return 0;
+  return hri === "both" ? 2 : 1;
+}
+
+function barcodeHeight(op) {
+  if (!op.bits) return (op.height || 80) + 24;
+  return (op.height || 80) + hriRows(op.hri) * 26;
+}
+
+function qrHeight(op) {
+  if (!op.matrix) return 140;
+  return op.matrix.length * Math.max(1, Number(op.module) || 6);
+}
 const SIZE_FACTOR = {
   normal: 1, "double-width": 1, "double-height": 1, double: 2, large: 3,
 };
@@ -87,12 +226,19 @@ function opsFromText() {
 
 function opsFromCode() {
   const type = $("code-type").value;
+  const data = $("code-data").value;
   if (type === "qr") {
-    return [{ kind: "placeholder", label: "二维码 QR", height: 140, align: "center" },
+    const ecc = $("qr-ecc").value;
+    return [{ kind: "qr", data, ecc, matrix: qrMatrix(data, ecc),
+              module: Number($("qr-module").value), align: "center" },
             { kind: "cut" }];
   }
-  return [{ kind: "placeholder", label: "条码 " + type.toUpperCase(),
-            height: Number($("bc-height").value) + 24, align: "center" }, { kind: "cut" }];
+  const encoded = encodeBarcode(type, data);
+  return [{ kind: "barcode", label: type.toUpperCase(),
+            bits: encoded ? encoded.bits : "", text: encoded ? encoded.text : data,
+            height: Number($("bc-height").value), width: Number($("bc-width").value),
+            hri: $("bc-hri").value, align: "center" },
+          { kind: "cut" }];
 }
 
 function opsFromBlocks() {
@@ -124,12 +270,19 @@ function opsFromBlocks() {
         ops.push({ kind: "text", text: (block.char || "-").repeat(columns), align: "left" });
         break;
       case "qr":
-        ops.push({ kind: "placeholder", label: "二维码 QR", height: 140, align: block.align });
+        ops.push({ kind: "qr", data: block.data, ecc: block.ecc,
+                   matrix: qrMatrix(block.data, block.ecc),
+                   module: Number(block.module || 6), align: block.align || "center" });
         break;
-      case "barcode":
-        ops.push({ kind: "placeholder", label: "条码 " + String(block.symbology).toUpperCase(),
-                   height: Number(block.height || 80) + 24, align: block.align });
+      case "barcode": {
+        const encoded = encodeBarcode(block.symbology, block.data);
+        ops.push({ kind: "barcode", label: String(block.symbology || "code128").toUpperCase(),
+                   bits: encoded ? encoded.bits : "",
+                   text: encoded ? encoded.text : String(block.data ?? ""),
+                   height: Number(block.height || 80), width: Number(block.width || 2),
+                   hri: block.hri || "below", align: block.align || "center" });
         break;
+      }
       case "image":
         ops.push({ kind: "bitmap", data: base64ToBytes(block.bitmap || ""),
                    width: Number(block.width || 576), height: Number(block.height || 0) });
@@ -182,6 +335,8 @@ function renderPreview() {
     } else if (op.kind === "feed") height += Number(op.lines || 1) * 30;
     else if (op.kind === "cut") height += 26;
     else if (op.kind === "bitmap") height += (op.height || 0) + 10;
+    else if (op.kind === "qr") height += qrHeight(op) + 14;
+    else if (op.kind === "barcode") height += barcodeHeight(op) + 14;
     else height += (op.height || 20) + 10;
   }
   canvas.width = width;
@@ -239,20 +394,14 @@ function renderPreview() {
     } else if (op.kind === "bitmap") {
       drawBitmap(op.data, op.width, op.height, y);
       y += (op.height || 0) + 10;
+    } else if (op.kind === "qr") {
+      y += 6;
+      y += drawQr(op, y) + 14;
+    } else if (op.kind === "barcode") {
+      y += 6;
+      y += drawBarcode(op, y) + 14;
     } else {
-      const boxHeight = op.height || 20;
-      const boxWidth = Math.min(canvas.width - 8, 220);
-      let x = 4;
-      if (op.align === "center") x = (canvas.width - boxWidth) / 2;
-      else if (op.align === "right") x = canvas.width - boxWidth - 4;
-      context.setLineDash([5, 4]);
-      context.strokeStyle = "#666";
-      context.strokeRect(x, y, boxWidth, boxHeight);
-      context.setLineDash([]);
-      context.fillStyle = "#666";
-      context.font = '14px "Segoe UI", sans-serif';
-      context.fillText(op.label || "元素", x + 8, y + 8);
-      y += boxHeight + 10;
+      y += drawPlaceholder(op, y) + 10;
     }
   }
   $("preview-meta").textContent =
@@ -273,6 +422,81 @@ function drawBitmap(data, width, height, top) {
     }
   }
   context.putImageData(image, 0, top);
+}
+
+function drawPlaceholder(op, top) {
+  const boxHeight = op.height || 20;
+  const boxWidth = Math.min(canvas.width - 8, 220);
+  let x = 4;
+  if (op.align === "center") x = (canvas.width - boxWidth) / 2;
+  else if (op.align === "right") x = canvas.width - boxWidth - 4;
+  context.save();
+  context.setLineDash([5, 4]);
+  context.strokeStyle = "#666";
+  context.strokeRect(x, top, boxWidth, boxHeight);
+  context.fillStyle = "#666";
+  context.font = '14px "Segoe UI", sans-serif';
+  context.fillText(op.label || "元素", x + 8, top + 8);
+  context.restore();
+  return boxHeight;
+}
+
+function drawQr(op, top) {
+  if (!op.matrix) {
+    return drawPlaceholder({ ...op, height: 140,
+                             label: (op.label || "二维码") + "：无法编码" }, top);
+  }
+  const module = Math.max(1, Number(op.module) || 6);
+  const size = op.matrix.length * module;
+  let x = 0;
+  if (op.align === "center") x = Math.max(0, (canvas.width - size) / 2);
+  else if (op.align === "right") x = Math.max(0, canvas.width - size);
+  context.save();
+  context.fillStyle = "#000";
+  for (let row = 0; row < op.matrix.length; row++) {
+    for (let col = 0; col < op.matrix[row].length; col++) {
+      if (op.matrix[row][col]) {
+        context.fillRect(x + col * module, top + row * module, module, module);
+      }
+    }
+  }
+  context.restore();
+  return size;
+}
+
+function drawBarcode(op, top) {
+  if (!op.bits) {
+    return drawPlaceholder({ ...op, height: (op.height || 80) + 24,
+                             label: (op.label || "条码") + "：内容不合法" }, top);
+  }
+  const moduleWidth = Math.max(1, Number(op.width) || 2);
+  const barHeight = Math.max(10, Number(op.height) || 80);
+  const total = op.bits.length * moduleWidth;
+  let x = 0;
+  if (op.align === "center") x = Math.max(0, (canvas.width - total) / 2);
+  else if (op.align === "right") x = Math.max(0, canvas.width - total);
+  const text = String(op.text ?? "");
+  context.save();
+  context.fillStyle = "#000";
+  context.font = '22px "Courier New", monospace';
+  context.textAlign = "center";
+  let y = top;
+  if (op.hri === "above" || op.hri === "both") {
+    context.fillText(text, x + total / 2, y);
+    y += 26;
+  }
+  for (let i = 0; i < op.bits.length; i++) {
+    if (op.bits[i] === "1") {
+      context.fillRect(x + i * moduleWidth, y, moduleWidth, barHeight);
+    }
+  }
+  y += barHeight;
+  if (op.hri === "below" || op.hri === "both") {
+    context.fillText(text, x + total / 2, y + 2);
+    y += 26;
+  }
+  context.restore();
+  return y - top;
 }
 
 /* ------------------------------------------------------------- image tools */
