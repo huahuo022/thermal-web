@@ -22,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import escpos
 import transport
+import auth
 from store import Store
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -164,8 +165,14 @@ def test_receipt(settings: dict) -> tuple:
 class Handler(BaseHTTPRequestHandler):
     server_version = "thermal-web/" + VERSION
     store: Store = None
-    password: str = ""
     username: str = "admin"
+    password: str = ""
+    password_sha256: str = ""
+    secret: bytes = b""
+    session_ttl: int = auth.DEFAULT_SESSION_HOURS * 3600
+    cookie_secure: bool = False
+    attempts = auth.Attempts()
+    PUBLIC_PATHS = ("/login", "/login.js", "/style.css", "/favicon.ico")
 
     # ------------------------------------------------------------- plumbing
     def log_message(self, fmt, *args):
@@ -183,24 +190,103 @@ class Handler(BaseHTTPRequestHandler):
     def _error(self, message, status=400):
         self._json({"ok": False, "error": str(message)}, status)
 
-    def _authorized(self) -> bool:
-        if not self.password:
-            return True
-        header = self.headers.get("Authorization", "")
-        if not header.startswith("Basic "):
-            return False
-        try:
-            raw = base64.b64decode(header[6:]).decode("utf-8")
-        except Exception:
-            return False
-        user, _, password = raw.partition(":")
-        return user == self.username and password == self.password
+    # ------------------------------------------------------------------ auth
+    @property
+    def auth_enabled(self) -> bool:
+        return bool(self.password or self.password_sha256)
 
-    def _deny(self):
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="thermal-web"')
+    def _client(self) -> str:
+        return self.client_address[0] if self.client_address else "?"
+
+    def _basic_user(self):
+        pair = auth.basic_credentials(self.headers.get("Authorization", ""))
+        if not pair or not auth.check_credentials(pair[0], pair[1], self.username,
+                                                   self.password, self.password_sha256):
+            return None
+        return pair[0]
+
+    def _cookie_user(self):
+        token = auth.read_cookie(self.headers.get("Cookie", ""))
+        return auth.parse_token(token, self.secret) if token else None
+
+    def _authorized(self):
+        """``""`` when auth is off, the user name when authenticated, else None."""
+        if not self.auth_enabled:
+            return ""
+        return self._basic_user() or self._cookie_user()
+
+    def _unauthorized(self, api: bool):
+        """No ``WWW-Authenticate`` header on purpose: the browser must keep
+        using our own login page instead of its native basic auth dialog."""
+        if api:
+            return self._json({"ok": False, "error": "未登录或会话已过期",
+                               "login": "/login"}, 401)
+        target = "/login?next=" + urllib.parse.quote(self.path or "/")
+        self.send_response(302)
+        self.send_header("Location", target)
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def _redirect(self, target: str):
+        self.send_response(302)
+        self.send_header("Location", target)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _session_cookie(self, user: str) -> str:
+        token = auth.make_token(user, self.secret, self.session_ttl)
+        cookie = "%s=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d" % (
+            auth.COOKIE_NAME, token, int(self.session_ttl))
+        if self.cookie_secure:
+            cookie += "; Secure"
+        return cookie
+
+    def _expired_cookie(self) -> str:
+        cookie = "%s=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" % auth.COOKIE_NAME
+        if self.cookie_secure:
+            cookie += "; Secure"
+        return cookie
+
+    def _send_json(self, payload, status=200, cookie: str = None):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _login(self, request: dict):
+        target = str(request.get("next") or "/")
+        if not target.startswith("/") or target.startswith("//"):
+            target = "/"
+        if not self.auth_enabled:
+            return self._send_json({"ok": True, "redirect": target})
+
+        client = self._client()
+        if self.attempts.blocked(client):
+            log("login throttled for %s" % client)
+            return self._json({"ok": False, "error": "尝试次数过多，请稍后再试"}, 429)
+
+        user = str(request.get("username", ""))
+        password = str(request.get("password", ""))
+        if not auth.check_credentials(user, password, self.username, self.password,
+                                      self.password_sha256):
+            self.attempts.fail(client)
+            log("failed login for user %r from %s" % (user, client))
+            return self._json({"ok": False, "error": "用户名或密码错误"}, 401)
+
+        self.attempts.reset(client)
+        log("login ok: %s from %s" % (user, client))
+        return self._send_json({"ok": True, "redirect": target},
+                               cookie=self._session_cookie(user))
+
+    def _logout(self):
+        log("logout from %s" % self._client())
+        return self._send_json({"ok": True, "redirect": "/login"},
+                               cookie=self._expired_cookie())
 
     def _body(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
@@ -240,7 +326,8 @@ class Handler(BaseHTTPRequestHandler):
             "version": VERSION,
             "settings": settings,
             "printer": info,
-            "auth_required": bool(self.password),
+            "auth_required": self.auth_enabled,
+            "user": self._authorized() or None,
             "server_time": time.strftime("%Y-%m-%d %H:%M:%S"),
         })
 
@@ -248,9 +335,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        if not self._authorized():
-            return self._deny()
         try:
+            if path in ("/login", "/login/"):
+                if not self.auth_enabled:
+                    return self._redirect("/")
+                return self._static("login.html")
+            if self._authorized() is None and path not in self.PUBLIC_PATHS:
+                return self._unauthorized(api=path.startswith("/api/"))
             if path == "/api/status":
                 return self._status()
             if path == "/api/settings":
@@ -273,14 +364,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        if not self._authorized():
-            return self._deny()
         try:
             request = self._body()
         except Exception as exc:  # noqa: BLE001
             return self._error(exc)
 
         try:
+            if path == "/api/login":
+                return self._login(request)
+            if path == "/api/logout":
+                return self._logout()
+            if self._authorized() is None:
+                return self._unauthorized(api=True)
             if path == "/api/settings":
                 settings = self.store.save_settings(request)
                 return self._json({"ok": True, "settings": settings})
@@ -354,14 +449,25 @@ def main(argv=None):
     options = parser.parse_args(argv)
 
     Handler.store = Store(os.path.join(options.data, "thermal-web.db"))
-    Handler.password = os.environ.get("THERMAL_WEB_PASSWORD", "")
     Handler.username = os.environ.get("THERMAL_WEB_USER", "admin")
+    Handler.password = os.environ.get("THERMAL_WEB_PASSWORD", "")
+    Handler.password_sha256 = os.environ.get("THERMAL_WEB_PASSWORD_SHA256", "")
+    Handler.secret = auth.load_secret(os.path.join(options.data, "session.key"))
+    Handler.session_ttl = int(float(os.environ.get(
+        "THERMAL_WEB_SESSION_HOURS", auth.DEFAULT_SESSION_HOURS)) * 3600)
+    Handler.cookie_secure = os.environ.get(
+        "THERMAL_WEB_COOKIE_SECURE", "").strip().lower() in ("1", "true", "yes", "on")
 
     server = Server((options.host, options.port), Handler)
     log("v%s listening on http://%s:%d  (data: %s)" %
         (VERSION, options.host, options.port, options.data))
-    if Handler.password:
-        log("HTTP basic auth enabled, user=%s" % Handler.username)
+    if Handler.auth_enabled:
+        source = "sha256" if Handler.password_sha256 else "plaintext"
+        log("login required (user=%s, password source=%s, session=%dh, secure cookie=%s)"
+            % (Handler.username, source, int(Handler.session_ttl / 3600),
+               Handler.cookie_secure))
+    else:
+        log("authentication disabled, the UI is open to everyone")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

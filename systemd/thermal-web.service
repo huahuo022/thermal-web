@@ -8,9 +8,10 @@ Type=simple
 WorkingDirectory=/opt/thermal-web
 ExecStart=/usr/bin/python3 /opt/thermal-web/server.py --port 8080
 Environment=THERMAL_WEB_DATA=/opt/thermal-web/data
-# HTTP basic auth lives outside the repo so install.sh never overwrites it:
+# Login settings live outside the repo so install.sh never overwrites them:
 #   /etc/thermal-web.env  ->  THERMAL_WEB_USER=admin
 #                             THERMAL_WEB_PASSWORD=your-password
+#                             (or THERMAL_WEB_PASSWORD_SHA256=<sha256 hex>)
 # The leading '-' keeps the unit working when the file does not exist.
 EnvironmentFile=-/etc/thermal-web.env
 Restart=on-failure

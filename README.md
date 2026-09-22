@@ -37,10 +37,13 @@ python3 server.py --port 8080 --data ./data
 
 打开 `http://<主机>:8080`。默认监听 `0.0.0.0`，在设置页把"打印目标"改成你的设备。
 
-### 加个密码
+### 登录与访问密码
 
-密码放在**仓库之外**的 `/etc/thermal-web.env`（权限 600），这样 `install.sh` 每次重新
-生成 unit 文件时都不会把它冲掉：
+启用后，未登录的浏览器会被重定向到 `/login` 登录页（与主界面同一套视觉），
+登录成功签发一个 HMAC 签名的会话 Cookie（`HttpOnly` + `SameSite=Lax`，默认 7 天）。
+
+密码放在**仓库之外**的 `/etc/thermal-web.env`（权限 600），这样 `install.sh` 每次
+重新生成 unit 文件时都不会把它冲掉：
 
 ```bash
 sudo tee /etc/thermal-web.env >/dev/null <<'EOF'
@@ -51,9 +54,29 @@ sudo chmod 600 /etc/thermal-web.env
 sudo systemctl restart thermal-web
 ```
 
-`install.sh` 首次运行会自动创建这个文件（带注释的模板）。删除文件里的密码行再重启
-即可关闭认证。unit 里的 `EnvironmentFile=-/etc/thermal-web.env` 前面那个 `-` 表示
-文件不存在也不报错。
+`install.sh` 首次运行会自动创建这个文件（带注释的模板）。把密码行注释掉再重启即可
+关闭认证；unit 里的 `EnvironmentFile=-/etc/thermal-web.env` 前面那个 `-` 表示文件
+不存在也不报错。
+
+不想让明文密码留在磁盘上，就改用哈希（哈希存在时优先于明文）：
+
+```bash
+printf 'THERMAL_WEB_USER=admin\nTHERMAL_WEB_PASSWORD_SHA256=%s\n' \
+  "$(printf '%s' '你的密码' | sha256sum | cut -d' ' -f1)" | sudo tee /etc/thermal-web.env
+sudo chmod 600 /etc/thermal-web.env
+sudo systemctl restart thermal-web
+```
+
+其他认证相关变量：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `THERMAL_WEB_SESSION_HOURS` | `168` | 会话有效期（小时） |
+| `THERMAL_WEB_COOKIE_SECURE` | `0` | 置 `1` 时给 Cookie 加 `Secure`（HTTPS 部署） |
+
+连续输错 5 次密码会临时限流（5 分钟窗口，按来源 IP 计）。所有 API 仍然接受
+HTTP Basic，方便脚本调用（`curl -u admin:密码 ...`）；服务器不会再返回
+`WWW-Authenticate`，所以浏览器不会弹出它自己的那套原生登录框。
 
 ### 把服务器本身当工作副本
 

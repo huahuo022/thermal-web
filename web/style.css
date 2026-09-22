@@ -24,6 +24,9 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--panel);
 }
+.topbar-right { display: flex; align-items: center; gap: 14px; }
+.userbar { display: flex; align-items: center; gap: 8px; padding-left: 14px;
+  border-left: 1px solid var(--line); }
 .brand { font-size: 16px; font-weight: 600; }
 .tag { color: var(--muted); font-size: 12px; font-weight: 400; }
 .status { font-size: 13px; color: var(--muted); }
@@ -120,3 +123,24 @@ table.history th, table.history td { text-align: left; padding: 7px 8px;
 table.history th { color: var(--muted); font-weight: 500; font-size: 12px; }
 table.history td.status-sent { color: var(--ok); }
 table.history td.status-failed { color: var(--err); }
+
+/* ---------------------------------------------------------------- login */
+.login-body { min-height: 100vh; margin: 0; display: grid; place-items: center;
+  background: radial-gradient(1000px 500px at 50% -10%, #1c2530 0%, var(--bg) 60%); }
+.login-wrap { width: 100%; display: grid; place-items: center; padding: 24px; }
+.login-card { width: 100%; max-width: 380px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 14px; padding: 26px 26px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45); }
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.login-brand h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: .3px; }
+.login-brand .hint { margin: 2px 0 0; }
+.login-icon { font-size: 30px; line-height: 1; }
+.login-card .field { margin-bottom: 14px; }
+.login-submit { width: 100%; padding: 10px 14px; margin-top: 6px; }
+.login-submit:disabled { opacity: .7; cursor: progress; }
+.login-error { margin: 4px 0 10px; padding: 9px 11px; border-radius: 8px;
+  background: rgba(229, 83, 75, .12); border: 1px solid rgba(229, 83, 75, .35);
+  color: #ffb4ae; font-size: 13px; }
+.login-foot { margin: 16px 0 0; text-align: center; }
+.login-foot code { background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 5px; font-size: 12px; }

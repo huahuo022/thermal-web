@@ -7,6 +7,11 @@ const api = async (path, body) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (response.status === 401 && !path.startsWith("/api/login")) {
+    // session gone: hand over to the login page, keeping the current view
+    location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
+    throw new Error("未登录或会话已过期");
+  }
   const data = await response.json().catch(() => ({ ok: false, error: response.statusText }));
   if (!response.ok || data.ok === false) throw new Error(data.error || response.statusText);
   return data;
@@ -620,6 +625,9 @@ async function loadStatus() {
   const data = await api("/api/status");
   state.settings = data.settings;
   $("version").textContent = "v" + data.version;
+  const userbar = $("userbar");
+  userbar.hidden = !data.auth_required;
+  if (data.auth_required) $("current-user").textContent = data.user || "";
   const printer = data.printer;
   const status = $("status");
   status.textContent = `${printer.target} · ${printer.available ? "就绪" : "不可用"} · ` +
@@ -726,6 +734,10 @@ function bind() {
   $("btn-dry").onclick = () => submit(true);
   $("btn-save").onclick = saveSettings;
   $("btn-test").onclick = testPrint;
+  $("btn-logout").onclick = async () => {
+    try { await api("/api/logout", {}); } catch (error) { /* ignore */ }
+    location.href = "/login";
+  };
   $("btn-history-refresh").onclick = refreshHistory;
   $("btn-history-clear").onclick = async () => {
     try {

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · thermal-web</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-body">
+<main class="login-wrap">
+  <form class="login-card" id="login-form" autocomplete="on">
+    <div class="login-brand">
+      <span class="login-icon">🖨️</span>
+      <div>
+        <h1>thermal-web</h1>
+        <p class="hint">热敏小票机 Web 控制台</p>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>用户名</span>
+      <input type="text" id="username" name="username" value="admin"
+             autocomplete="username" autocapitalize="off" autofocus required>
+    </label>
+
+    <label class="field">
+      <span>密码</span>
+      <input type="password" id="password" name="password"
+             autocomplete="current-password" required>
+    </label>
+
+    <p class="login-error" id="login-error" hidden></p>
+
+    <button class="primary login-submit" id="login-submit" type="submit">登录</button>
+
+    <p class="hint login-foot">
+      密码在服务器的 <code>/etc/thermal-web.env</code> 里配置
+    </p>
+  </form>
+</main>
+<script src="/login.js"></script>
+</body>
+</html>

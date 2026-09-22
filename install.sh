@@ -19,9 +19,15 @@ chmod -R a+rX "$DEST"
 
 if [ ! -f /etc/thermal-web.env ]; then
   cat > /etc/thermal-web.env <<'ENVEOF'
-# thermal-web environment - uncomment and edit to enable HTTP basic auth.
+# thermal-web environment - uncomment and edit to require a login.
 #THERMAL_WEB_USER=admin
 #THERMAL_WEB_PASSWORD=change-me
+# Store a hash instead of the plaintext password (takes precedence):
+#THERMAL_WEB_PASSWORD_SHA256=
+# Session lifetime in hours (default 168 = 7 days), and set to 1 when
+# serving the UI over HTTPS so the cookie is only sent over TLS:
+#THERMAL_WEB_SESSION_HOURS=168
+#THERMAL_WEB_COOKIE_SECURE=0
 ENVEOF
   chmod 600 /etc/thermal-web.env
   echo "==> created /etc/thermal-web.env (600) - edit it to set a password"

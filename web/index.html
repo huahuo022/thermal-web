@@ -9,7 +9,13 @@
 <body>
 <header class="topbar">
   <div class="brand">🖨️ thermal-web <span class="tag" id="version"></span></div>
-  <div class="status" id="status">连接中…</div>
+  <div class="topbar-right">
+    <div class="status" id="status">连接中…</div>
+    <div class="userbar" id="userbar" hidden>
+      <span class="tag" id="current-user"></span>
+      <button class="tiny" id="btn-logout">退出</button>
+    </div>
+  </div>
 </header>
 
 <nav class="tabs">
