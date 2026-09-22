@@ -46,11 +46,12 @@ body {
 .tab.active { color: var(--text); background: var(--panel); border-color: var(--line);
   border-bottom-color: var(--panel); }
 
-main {
+/* 只作用于主界面：登录页也是 <main>，不能让它继承这套两栏栅格 */
+main.app-main {
   display: grid; grid-template-columns: minmax(420px, 1fr) minmax(320px, 560px);
   gap: 16px; padding: 0 14px 24px;
 }
-@media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { main.app-main { grid-template-columns: 1fr; } }
 
 .panel {
   display: none; background: var(--panel); border: 1px solid var(--line);
@@ -154,9 +155,6 @@ table.history td.status-failed { color: var(--err); }
 .login-error { margin: 4px 0 10px; padding: 9px 11px; border-radius: 8px;
   background: rgba(229, 83, 75, .12); border: 1px solid rgba(229, 83, 75, .35);
   color: #ffb4ae; font-size: 13px; }
-.login-foot { margin: 16px 0 0; text-align: center; }
-.login-foot code { background: var(--panel-2); border: 1px solid var(--line);
-  border-radius: 5px; padding: 1px 5px; font-size: 12px; }
 
 /* --------------------------------------------------------------- update */
 .update-box { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
