@@ -48,6 +48,19 @@ Environment=THERMAL_WEB_PASSWORD=your-password
 然后 `systemctl daemon-reload && systemctl restart thermal-web`，即启用 HTTP Basic 认证
 （用户名默认 `admin`，可用 `THERMAL_WEB_USER` 改）。
 
+### 把服务器本身当工作副本
+
+如果打印服务器就是你要改代码的地方（用仓库的 deploy key 推送）：
+
+```bash
+cd /root/thermal-web
+vim escpos.py                       # 改代码
+git commit -am "fix: ..." && git push
+sudo ./deploy.sh                    # 拉取 + 重新部署 + 重启服务
+```
+
+`deploy.sh` 只做两件事：`git pull --ff-only`，然后调用 `install.sh`。
+
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
